@@ -1,3 +1,85 @@
 type: install
 id: matomo-server
 name: Matomo
+logo: https://m-img.org/spai/w_187+q_lossless+ret_img+to_webp/https://fr.matomo.org/wp-content/uploads/2020/03/matomo-logo-winner-mobile3-366x50.png
+ssl: true
+
+description: 
+  text: Matomo is the most common free and open source web analytics application to track online visits to one or more websites and display reports on these visits for analysis.
+
+categories:
+- apps/dev-and-admin-tools
+- apps/collaboration
+  
+globals: 
+  user: root 
+  MYSQL_PASSWORD: ${fn.password(15)}
+
+
+nodes:
+  - nodeType: dockerengine
+    nodeGroup: cp
+    cloudlets: 16
+    extip: false
+    displayName: Matomo
+
+  - nodeType: mysql
+    nodeGroup: sqldb
+    count: 1
+    cloudlets: 16
+    skipNodeEmails: true 
+
+
+onInstall:
+  - reset-db-password
+  - config-backup-db
+  - config-matomo
+  - start-matomo
+  - add-files-to-favorite
+
+actions:
+
+  reset-db-password : 
+    - log: configuration Password MariaDB
+    - cmd[sqldb]:
+       - jem passwd set -p "${globals.MYSQL_PASSWORD}"
+      user: root
+
+  config-backup-db : 
+    - log: configuration Backup database
+    - cmd[sqldb]:
+       - echo "0 2 * * * /var/lib/jelastic/bin/backup_script.sh -m dumpall -c 7 -u root -p ${globals.MYSQL_PASSWORD}" >> /var/spool/cron/mysql
+       
+  config-matomo:      
+    - cmd[cp]: 
+       - mkdir /root/matomo
+       - echo '/root/matomo' >> /etc/jelastic/redeploy.conf
+       - wget https://raw.githubusercontent.com/HidoraSwiss/matomo-manifest/main/docker-compose.yaml -O /root/matomo/docker-compose.yaml
+       - wget https://raw.githubusercontent.com/HidoraSwiss/matomo-manifest/main/env -O /root/matomo/db.env
+       - sed -i 's/DB_PASSWORD_TO_REPLACE/${globals.MYSQL_PASSWORD}/g' /root/matomo/db.env
+     
+  start-matomo:      
+    - cmd[cp]: 
+       - cd /root/matomo && docker-compose up -d      
+
+  add-files-to-favorite:      
+    - env.file.AddFavorite:
+        nodeGroup: cp
+        path: /root/matomo/docker-compose.yaml
+        isDir: false
+
+    - env.file.AddFavorite:
+        nodeGroup: cp
+        path: /root
+        isDir: true
+        
+    - env.file.AddFavorite:
+        nodeGroup: cp
+        path: /root/matomo
+        isDir: true
+        
+    
+success: | 
+  **Matomo Server**: [https://${env.domain}/](https://${env.domain}/)  
+  **Database username**: ${globals.user}  
+  **Database Password**: ${globals.MYSQL_PASSWORD}    
