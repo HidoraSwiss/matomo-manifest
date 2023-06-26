@@ -1,0 +1,19 @@
+version: "3"
+
+services:
+  app:
+    image: matomo:4
+    restart: always
+    volumes:
+#     - ./config:/var/www/html/config:z
+#     - ./logs:/var/www/html/logs:z
+      - matomo:/var/www/html:z
+    environment:
+      - MATOMO_DATABASE_HOST=sqldb
+    env_file:
+      - ./db.env
+    ports:
+      - 80:80
+      
+volumes:
+  matomo:
